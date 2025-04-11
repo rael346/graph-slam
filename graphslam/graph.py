@@ -1,10 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
-from scipy.linalg import issymmetric
 from scipy.sparse import lil_matrix
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
+import imageio
+from PIL import Image
 from graphslam.edge_odometry import Edge
 from graphslam.se2 import SE2
 
@@ -14,6 +15,10 @@ class Graph:
         poses, edges = self.from_g2o(path)
         self.poses = poses
         self.edges = edges
+
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot()
+        self.num_iter = -1
 
     def from_g2o(self, path: str) -> tuple[list[SE2], list[Edge]]:
         poses: list[SE2] = []
@@ -32,21 +37,22 @@ class Graph:
         return (poses, edges)
 
     def calc_b(self) -> NDArray[np.float64]:
-        len_b = len(self.poses) * 3
+        len_b = len(self.poses) * SE2.COMPACT_DIM
+
         b = np.zeros(len_b, dtype=np.float64)
         for edge in self.edges:
             i, j = edge.pose_ids
-            b_i_contribution, b_j_contribution = edge.gradient()
+            b_i_contrib, b_j_contrib = edge.gradient()
             if i != 0:
-                b[i * 3 : i * 3 + 3] += b_i_contribution
+                b[i * 3 : (i + 1) * 3] += b_i_contrib
 
             if j != 0:
-                b[j * 3 : j * 3 + 3] += b_j_contribution
+                b[j * 3 : (j + 1) * 3] += b_j_contrib
 
         return b
 
     def calc_H(self) -> lil_matrix:
-        len_b = len(self.poses) * 3
+        len_b = len(self.poses) * SE2.COMPACT_DIM
         H_dict: dict[tuple[int, int], NDArray[np.float64]] = {}
 
         for edge in self.edges:
@@ -75,8 +81,11 @@ class Graph:
     def optimize(self, max_iter=20):
         curr_chi2 = self.calc_chi2()
 
-        for i in range(max_iter):
-            print(f"Iter {i} | chi2 val {curr_chi2}")
+        num_iter = 0
+        for optimize_i in range(max_iter):
+            print(f"Iter {optimize_i} | chi2 val {curr_chi2}")
+            num_iter += 1
+
             H, b = self.calc_H(), self.calc_b()
             dx = spsolve(H.tocsr(), -b)
 
@@ -84,19 +93,33 @@ class Graph:
                 self.poses[i] += SE2(dx[i * 3 : i * 3 + 2], dx[i * 3 + 2])
 
             new_chi2 = self.calc_chi2()
+
+            self.ax.clear()
+            self.ax.set_axis_off()
+            self.plot()
+            self.fig.savefig(f"./results/iter_{optimize_i}.png")
+
             if np.isclose(curr_chi2, new_chi2):
                 break
 
             curr_chi2 = new_chi2
+        self.num_iter = num_iter
 
     def plot(self):
-        fig = plt.figure()
-        ax = fig.add_subplot()
-
         for e in self.edges:
-            e.plot(ax)
+            e.plot(self.ax)
 
         for p in self.poses:
-            p.plot(ax)
+            p.plot(self.ax)
 
+    def show(self):
         plt.show()
+
+    def gif(self):
+        frames = []
+
+        for i in range(self.num_iter):
+            frame = Image.open(f"results/iter_{i}.png")
+            frame = np.asarray(frame)
+            frames.append(np.array(frame))
+        imageio.mimsave("results/graph.gif", frames, fps=2)

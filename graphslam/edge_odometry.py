@@ -44,7 +44,8 @@ class Edge:
     def chi2(self) -> float:
         # the type for np.matmul couldn't infer the
         # single return value case so this is just to make the inference a bit better
-        val = cast(np.float64, self.e.to_compact().T @ self.info @ self.e.to_compact())
+        e_compact = self.e.to_compact()
+        val = cast(np.float64, e_compact.T @ self.info @ e_compact)
         return val
 
     def jacobians(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -58,9 +59,10 @@ class Edge:
 
     def gradient(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         A_ij, B_ij = self.jacobians()
+        e_compact = self.e.to_compact()
         return (
-            A_ij.T @ self.info @ self.e.to_compact(),
-            B_ij.T @ self.info @ self.e.to_compact(),
+            A_ij.T @ self.info @ e_compact,
+            B_ij.T @ self.info @ e_compact,
         )
 
     def hessian(
@@ -68,8 +70,8 @@ class Edge:
     ) -> list[tuple[tuple[int, int], NDArray[np.float64]]]:
         A_ij, B_ij = self.jacobians()
         i, j = self.pose_ids
-        i = i * 3
-        j = j * 3
+        i = i * SE2.COMPACT_DIM
+        j = j * SE2.COMPACT_DIM
 
         return [
             ((i, i), A_ij.T @ self.info @ A_ij),

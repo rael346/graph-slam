@@ -8,6 +8,8 @@ from graphslam.utils import norm_angle
 
 
 class SE2:
+    COMPACT_DIM = 3
+
     def __init__(self, t: NDArray[np.float64], theta: float):
         self.t = t
         self.theta = norm_angle(theta)
