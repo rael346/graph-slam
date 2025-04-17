@@ -1,26 +1,22 @@
 import numpy as np
-from numpy.typing import NDArray
+import numpy.typing as npt
+import typing
+
 from scipy.sparse import lil_matrix
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-import imageio
-from PIL import Image
 from graphslam.edge_odometry import Edge
 from graphslam.se2 import SE2
 
 
 class Graph:
-    def __init__(self, path: str) -> None:
-        poses, edges = self.from_g2o(path)
+    def __init__(self, poses: list[SE2], edges: list[Edge]) -> None:
         self.poses = poses
         self.edges = edges
 
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot()
-        self.num_iter = -1
-
-    def from_g2o(self, path: str) -> tuple[list[SE2], list[Edge]]:
+    @classmethod
+    def from_g2o(cls, path: str) -> typing.Self:
         poses: list[SE2] = []
         edges: list[Edge] = []
         with open(path, "r") as file:
@@ -34,9 +30,9 @@ class Graph:
                 if section == "EDGE_SE2":
                     edge = Edge.from_g2o(line[1:], poses)
                     edges.append(edge)
-        return (poses, edges)
+        return cls(poses, edges)
 
-    def calc_b(self) -> NDArray[np.float64]:
+    def calc_b(self) -> npt.NDArray[np.float64]:
         len_b = len(self.poses) * SE2.COMPACT_DIM
 
         b = np.zeros(len_b, dtype=np.float64)
@@ -52,21 +48,18 @@ class Graph:
         return b
 
     def calc_H(self) -> lil_matrix:
-        len_b = len(self.poses) * SE2.COMPACT_DIM
-        H_dict: dict[tuple[int, int], NDArray[np.float64]] = {}
-
+        # Incremently load the Hessian contributions to a dictionary.
+        # This is way faster than adding to the sparse matrix directly
+        H_dict: dict[tuple[int, int], npt.NDArray[np.float64]] = {}
         for edge in self.edges:
-            for (r, c), contrib in edge.hessian():
-                if r <= c:
-                    H_dict[(r, c)] = contrib + H_dict.get(
-                        (r, c), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
-                    )
-                else:
-                    H_dict[(c, r)] = contrib.T + H_dict.get(
-                        (c, r), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
-                    )
+            for r, c, contrib in edge.hessian():
+                H_dict[(r, c)] = contrib + H_dict.get(
+                    (r, c), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
+                )
 
+        len_b = len(self.poses) * SE2.COMPACT_DIM
         H = lil_matrix((len_b, len_b), dtype=np.float64)
+
         # fixed the first node
         H[0 : SE2.COMPACT_DIM, 0 : SE2.COMPACT_DIM] = np.eye(SE2.COMPACT_DIM)
 
@@ -75,21 +68,20 @@ class Graph:
                 continue
             H[r : r + SE2.COMPACT_DIM, c : c + SE2.COMPACT_DIM] = contrib
 
-            if r != c:
-                H[c : c + SE2.COMPACT_DIM, r : r + SE2.COMPACT_DIM] = contrib.T
-
         return H
 
     def calc_chi2(self) -> float:
         return np.sum([edge.chi2() for edge in self.edges])
 
     def optimize(self, max_iter=20):
-        curr_chi2 = self.calc_chi2()
+        prev_chi2 = float("inf")
 
-        num_iter = 0
         for optimize_i in range(max_iter):
+            curr_chi2 = self.calc_chi2()
             print(f"Iter {optimize_i} | chi2 val {curr_chi2}")
-            num_iter += 1
+            if np.isclose(prev_chi2, curr_chi2):
+                break
+            prev_chi2 = curr_chi2
 
             H, b = self.calc_H(), self.calc_b()
             dx = spsolve(H.tocsr(), -b)
@@ -99,34 +91,12 @@ class Graph:
                     dx[i * SE2.COMPACT_DIM : (i + 1) * SE2.COMPACT_DIM]
                 )
 
-            new_chi2 = self.calc_chi2()
-
-            self.ax.clear()
-            self.ax.set_axis_off()
-            self.plot()
-            self.fig.savefig(f"./results/iter_{optimize_i}.png")
-
-            if np.isclose(curr_chi2, new_chi2):
-                break
-
-            curr_chi2 = new_chi2
-        self.num_iter = num_iter
-
     def plot(self):
+        fig = plt.figure()
+        ax = fig.add_subplot()
         for e in self.edges:
-            e.plot(self.ax)
+            e.plot(ax)
 
         for p in self.poses:
-            p.plot(self.ax)
-
-    def show(self):
+            p.plot(ax)
         plt.show()
-
-    def gif(self):
-        frames = []
-
-        for i in range(self.num_iter):
-            frame = Image.open(f"results/iter_{i}.png")
-            frame = np.asarray(frame)
-            frames.append(np.array(frame))
-        imageio.mimsave("results/graph.gif", frames, fps=2)

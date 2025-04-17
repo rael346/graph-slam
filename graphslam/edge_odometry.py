@@ -65,20 +65,17 @@ class Edge:
             B_ij.T @ self.info @ e_compact,
         )
 
-    def hessian(
-        self,
-    ) -> list[tuple[tuple[int, int], NDArray[np.float64]]]:
+    def hessian(self) -> list[tuple[int, int, NDArray[np.float64]]]:
         A_ij, B_ij = self.jacobians()
         i, j = self.pose_ids
         i = i * SE2.COMPACT_DIM
         j = j * SE2.COMPACT_DIM
 
-        return [
-            ((i, i), A_ij.T @ self.info @ A_ij),
-            ((i, j), A_ij.T @ self.info @ B_ij),
-            # ((j, i), B_ij.T @ self.info @ A_ij),
-            ((j, j), B_ij.T @ self.info @ B_ij),
-        ]
+        H_ii = A_ij.T @ self.info @ A_ij
+        H_ij = A_ij.T @ self.info @ B_ij
+        H_jj = B_ij.T @ self.info @ B_ij
+
+        return [(i, i, H_ii), (i, j, H_ij), (j, i, H_ij.T), (j, j, H_jj)]
 
     def plot(self, ax: Axes):
         out_id, in_id = self.pose_ids

@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Self
 from matplotlib.axes import Axes
 import numpy as np
-from numpy.typing import NDArray
+import numpy.typing as npt
+import typing
 
 from graphslam.utils import norm_angle
 
@@ -10,22 +10,22 @@ from graphslam.utils import norm_angle
 class SE2:
     COMPACT_DIM = 3
 
-    def __init__(self, t: NDArray[np.float64], theta: float) -> None:
+    def __init__(self, t: npt.NDArray[np.float64], theta: float) -> None:
         self.t = t
         self.theta = norm_angle(theta)
 
     @classmethod
-    def from_mat(cls, matrix: NDArray[np.float64]) -> Self:
+    def from_mat(cls, matrix: npt.NDArray[np.float64]) -> typing.Self:
         return cls(matrix[0:2, 2], np.atan2(matrix[1, 0], matrix[0, 0]))
 
     @classmethod
-    def from_g2o(cls, line: list[str]) -> Self:
+    def from_g2o(cls, line: list[str]) -> typing.Self:
         t = np.array([float(s) for s in line[:2]], dtype=np.float64)
         theta = float(line[2])
         return cls(t, theta)
 
     @property
-    def R(self) -> NDArray[np.float64]:
+    def R(self) -> npt.NDArray[np.float64]:
         return np.array(
             [
                 [np.cos(self.theta), -np.sin(self.theta)],
@@ -35,7 +35,7 @@ class SE2:
         )
 
     @property
-    def dR(self) -> NDArray[np.float64]:
+    def dR(self) -> npt.NDArray[np.float64]:
         return np.array(
             [
                 [-np.sin(self.theta), -np.cos(self.theta)],
@@ -44,7 +44,7 @@ class SE2:
             dtype=np.float64,
         )
 
-    def to_mat(self) -> NDArray[np.float64]:
+    def to_mat(self) -> npt.NDArray[np.float64]:
         R = self.R
         return np.array(
             [
@@ -55,11 +55,11 @@ class SE2:
             dtype=np.float64,
         )
 
-    def to_compact(self) -> NDArray[np.float64]:
+    def to_compact(self) -> npt.NDArray[np.float64]:
         return np.array([self.t[0], self.t[1], self.theta], dtype=np.float64)
 
     @staticmethod
-    def J_sub_p1(_: SE2, p2: SE2) -> NDArray[np.float64]:
+    def J_sub_p1(_: SE2, p2: SE2) -> npt.NDArray[np.float64]:
         dt_dt = p2.R.T
         return np.array(
             [
@@ -71,7 +71,7 @@ class SE2:
         )
 
     @staticmethod
-    def J_sub_p2(p1: SE2, p2: SE2) -> NDArray[np.float64]:
+    def J_sub_p2(p1: SE2, p2: SE2) -> npt.NDArray[np.float64]:
         dt_dt = -p2.R.T
         dt_dtheta = p2.dR.T @ (p1.t - p2.t)
         return np.array(
@@ -84,7 +84,7 @@ class SE2:
         )
 
     @staticmethod
-    def J_add_delta_x(p: SE2) -> NDArray[np.float64]:
+    def J_add_delta_x(p: SE2) -> npt.NDArray[np.float64]:
         return np.array(
             [
                 [np.cos(p.theta), -np.sin(p.theta), 0],
@@ -103,7 +103,7 @@ class SE2:
     def __sub__(self, other: SE2) -> SE2:
         return SE2(other.R.T @ (self.t - other.t), self.theta - other.theta)
 
-    def update(self, delta: NDArray[np.float64]) -> None:
+    def update(self, delta: npt.NDArray[np.float64]) -> None:
         self.t += delta[0:2]
         self.theta += delta[2]
 
