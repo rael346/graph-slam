@@ -10,7 +10,7 @@ from graphslam.utils import norm_angle
 class SE2:
     COMPACT_DIM = 3
 
-    def __init__(self, t: NDArray[np.float64], theta: float):
+    def __init__(self, t: NDArray[np.float64], theta: float) -> None:
         self.t = t
         self.theta = norm_angle(theta)
 
@@ -35,7 +35,7 @@ class SE2:
         )
 
     @property
-    def delta_R(self) -> NDArray[np.float64]:
+    def dR(self) -> NDArray[np.float64]:
         return np.array(
             [
                 [-np.sin(self.theta), -np.cos(self.theta)],
@@ -73,7 +73,7 @@ class SE2:
     @staticmethod
     def J_sub_p2(p1: SE2, p2: SE2) -> NDArray[np.float64]:
         dt_dt = -p2.R.T
-        dt_dtheta = p2.delta_R.T @ (p1.t - p2.t)
+        dt_dtheta = p2.dR.T @ (p1.t - p2.t)
         return np.array(
             [
                 [dt_dt[0, 0], dt_dt[0, 1], dt_dtheta[0]],
@@ -102,6 +102,10 @@ class SE2:
 
     def __sub__(self, other: SE2) -> SE2:
         return SE2(other.R.T @ (self.t - other.t), self.theta - other.theta)
+
+    def update(self, delta: NDArray[np.float64]) -> None:
+        self.t += delta[0:2]
+        self.theta += delta[2]
 
     def __str__(self) -> str:
         return f"PoseSE2(t=[{self.t[0]}, {self.t[1]}], theta={self.theta})"

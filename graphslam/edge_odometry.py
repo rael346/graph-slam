@@ -39,7 +39,7 @@ class Edge:
     def e(self) -> SE2:
         p_i = self.poses[self.pose_ids[0]]
         p_j = self.poses[self.pose_ids[1]]
-        return self.z - (p_j - p_i)
+        return (p_j - p_i) - self.z
 
     def chi2(self) -> float:
         # the type for np.matmul couldn't infer the
@@ -51,10 +51,10 @@ class Edge:
     def jacobians(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         p_i = self.poses[self.pose_ids[0]]
         p_j = self.poses[self.pose_ids[1]]
-        J_error_wrt_pred = SE2.J_sub_p2(self.z, p_j - p_i)
+        J_error_wrt_pred = SE2.J_sub_p1(p_j - p_i, self.z)
 
-        A_ij = J_error_wrt_pred @ SE2.J_sub_p2(p_j, p_i) @ SE2.J_add_delta_x(p_i)
-        B_ij = J_error_wrt_pred @ SE2.J_sub_p1(p_j, p_i) @ SE2.J_add_delta_x(p_j)
+        A_ij = J_error_wrt_pred @ SE2.J_sub_p2(p_j, p_i)
+        B_ij = J_error_wrt_pred @ SE2.J_sub_p1(p_j, p_i)
         return (A_ij, B_ij)
 
     def gradient(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:

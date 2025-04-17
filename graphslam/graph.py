@@ -44,10 +44,10 @@ class Graph:
             i, j = edge.pose_ids
             b_i_contrib, b_j_contrib = edge.gradient()
             if i != 0:
-                b[i * 3 : (i + 1) * 3] += b_i_contrib
+                b[i * SE2.COMPACT_DIM : (i + 1) * SE2.COMPACT_DIM] += b_i_contrib
 
             if j != 0:
-                b[j * 3 : (j + 1) * 3] += b_j_contrib
+                b[j * SE2.COMPACT_DIM : (j + 1) * SE2.COMPACT_DIM] += b_j_contrib
 
         return b
 
@@ -58,20 +58,25 @@ class Graph:
         for edge in self.edges:
             for (r, c), contrib in edge.hessian():
                 if r <= c:
-                    H_dict[(r, c)] = contrib + H_dict.get((r, c), np.zeros((3, 3)))
+                    H_dict[(r, c)] = contrib + H_dict.get(
+                        (r, c), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
+                    )
                 else:
-                    H_dict[(c, r)] = contrib.T + H_dict.get((c, r), np.zeros((3, 3)))
+                    H_dict[(c, r)] = contrib.T + H_dict.get(
+                        (c, r), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
+                    )
 
         H = lil_matrix((len_b, len_b), dtype=np.float64)
-        H[0:3, 0:3] = np.eye(3, 3)
+        # fixed the first node
+        H[0 : SE2.COMPACT_DIM, 0 : SE2.COMPACT_DIM] = np.eye(SE2.COMPACT_DIM)
 
         for (r, c), contrib in H_dict.items():
-            if r == 0 or c == 0:
+            if r == 0 and c == 0:
                 continue
-            H[r : r + 3, c : c + 3] = contrib
+            H[r : r + SE2.COMPACT_DIM, c : c + SE2.COMPACT_DIM] = contrib
 
             if r != c:
-                H[c : c + 3, r : r + 3] = contrib.T
+                H[c : c + SE2.COMPACT_DIM, r : r + SE2.COMPACT_DIM] = contrib.T
 
         return H
 
@@ -90,7 +95,9 @@ class Graph:
             dx = spsolve(H.tocsr(), -b)
 
             for i in range(len(self.poses)):
-                self.poses[i] += SE2(dx[i * 3 : i * 3 + 2], dx[i * 3 + 2])
+                self.poses[i].update(
+                    dx[i * SE2.COMPACT_DIM : (i + 1) * SE2.COMPACT_DIM]
+                )
 
             new_chi2 = self.calc_chi2()
 
