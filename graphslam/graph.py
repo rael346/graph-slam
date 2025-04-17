@@ -38,21 +38,25 @@ class Graph:
         b = np.zeros(len_b, dtype=np.float64)
         for edge in self.edges:
             i, j = edge.pose_ids
-            b_i_contrib, b_j_contrib = edge.gradient()
+            b_i, b_j = edge.calc_b()
             if i != 0:
-                b[i * SE2.COMPACT_DIM : (i + 1) * SE2.COMPACT_DIM] += b_i_contrib
+                b[i * SE2.COMPACT_DIM : (i + 1) * SE2.COMPACT_DIM] += b_i
 
             if j != 0:
-                b[j * SE2.COMPACT_DIM : (j + 1) * SE2.COMPACT_DIM] += b_j_contrib
+                b[j * SE2.COMPACT_DIM : (j + 1) * SE2.COMPACT_DIM] += b_j
 
         return b
 
     def calc_H(self) -> lil_matrix:
-        # Incremently load the Hessian contributions to a dictionary.
+        # Incremently load the Hessian contributions to a dict.
         # This is way faster than adding to the sparse matrix directly
+        # Note: storing in a dict then assign to a lil_matrix is way
+        # faster than using a dok_matrix (by about 4 times) since
+        # H will need to be converted to CSR/CSC format later for spsolve()
+        # and dok_matrix is very inefficient in this conversion operation
         H_dict: dict[tuple[int, int], npt.NDArray[np.float64]] = {}
         for edge in self.edges:
-            for r, c, contrib in edge.hessian():
+            for r, c, contrib in edge.calc_H():
                 H_dict[(r, c)] = contrib + H_dict.get(
                     (r, c), np.zeros((SE2.COMPACT_DIM, SE2.COMPACT_DIM))
                 )
@@ -71,7 +75,7 @@ class Graph:
         return H
 
     def calc_chi2(self) -> float:
-        return np.sum([edge.chi2() for edge in self.edges])
+        return np.sum([edge.calc_chi2() for edge in self.edges])
 
     def optimize(self, max_iter=20):
         prev_chi2 = float("inf")

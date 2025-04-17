@@ -1,8 +1,8 @@
 from typing import Self
 from matplotlib.axes import Axes
-from numpy.typing import NDArray
 from typing import cast
 import numpy as np
+import numpy.typing as npt
 
 from graphslam.se2 import SE2
 
@@ -11,7 +11,7 @@ class Edge:
     def __init__(
         self,
         pose_ids: tuple[int, int],
-        info: NDArray[np.float64],
+        info: npt.NDArray[np.float64],
         z: SE2,
         poses: list[SE2],
     ) -> None:
@@ -41,14 +41,14 @@ class Edge:
         p_j = self.poses[self.pose_ids[1]]
         return (p_j - p_i) - self.z
 
-    def chi2(self) -> float:
+    def calc_chi2(self) -> float:
         # the type for np.matmul couldn't infer the
         # single return value case so this is just to make the inference a bit better
         e_compact = self.e.to_compact()
         val = cast(np.float64, e_compact.T @ self.info @ e_compact)
         return val
 
-    def jacobians(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    def calc_jacobians(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         p_i = self.poses[self.pose_ids[0]]
         p_j = self.poses[self.pose_ids[1]]
         J_error_wrt_pred = SE2.J_sub_p1(p_j - p_i, self.z)
@@ -57,16 +57,16 @@ class Edge:
         B_ij = J_error_wrt_pred @ SE2.J_sub_p1(p_j, p_i)
         return (A_ij, B_ij)
 
-    def gradient(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-        A_ij, B_ij = self.jacobians()
+    def calc_b(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        A_ij, B_ij = self.calc_jacobians()
         e_compact = self.e.to_compact()
         return (
             A_ij.T @ self.info @ e_compact,
             B_ij.T @ self.info @ e_compact,
         )
 
-    def hessian(self) -> list[tuple[int, int, NDArray[np.float64]]]:
-        A_ij, B_ij = self.jacobians()
+    def calc_H(self) -> list[tuple[int, int, npt.NDArray[np.float64]]]:
+        A_ij, B_ij = self.calc_jacobians()
         i, j = self.pose_ids
         i = i * SE2.COMPACT_DIM
         j = j * SE2.COMPACT_DIM
