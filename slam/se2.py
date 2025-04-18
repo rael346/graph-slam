@@ -4,7 +4,9 @@ import numpy as np
 import numpy.typing as npt
 import typing
 
-from graphslam.utils import norm_angle
+
+def norm_angle(angle: float) -> float:
+    return (angle + np.pi) % (2 * np.pi) - np.pi
 
 
 class SE2:
@@ -20,8 +22,8 @@ class SE2:
 
     @classmethod
     def from_g2o(cls, line: list[str]) -> typing.Self:
-        t = np.array([float(s) for s in line[:2]], dtype=np.float64)
-        theta = float(line[2])
+        t = np.array([float(line[2]), float(line[3])], dtype=np.float64)
+        theta = float(line[4])
         return cls(t, theta)
 
     @property
@@ -105,7 +107,7 @@ class SE2:
 
     def update(self, delta: npt.NDArray[np.float64]) -> None:
         self.t += delta[0:2]
-        self.theta += delta[2]
+        self.theta = norm_angle(self.theta + delta[2])
 
     def __str__(self) -> str:
         return f"PoseSE2(t=[{self.t[0]}, {self.t[1]}], theta={self.theta})"

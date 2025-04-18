@@ -6,8 +6,8 @@ from scipy.sparse import lil_matrix
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-from graphslam.edge_odometry import Edge
-from graphslam.se2 import SE2
+from slam.edge import Edge
+from slam.se2 import SE2
 
 
 class Graph:
@@ -24,11 +24,11 @@ class Graph:
                 line = line.split()
                 section = line[0]
                 if section == "VERTEX_SE2":
-                    pose = SE2.from_g2o(line[2:])
+                    pose = SE2.from_g2o(line)
                     poses.append(pose)
 
                 if section == "EDGE_SE2":
-                    edge = Edge.from_g2o(line[1:], poses)
+                    edge = Edge.from_g2o(line, poses)
                     edges.append(edge)
         return cls(poses, edges)
 
@@ -86,6 +86,9 @@ class Graph:
             if np.isclose(prev_chi2, curr_chi2):
                 break
             prev_chi2 = curr_chi2
+
+            for e in self.edges:
+                e.calc_jacobians()
 
             H, b = self.calc_H(), self.calc_b()
             dx = spsolve(H.tocsr(), -b)

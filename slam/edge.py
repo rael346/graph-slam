@@ -4,7 +4,7 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
-from graphslam.se2 import SE2
+from slam.se2 import SE2
 
 
 class Edge:
@@ -19,12 +19,18 @@ class Edge:
         self.info = info
         self.z = z
         self.poses = poses
+        self.A_ij: npt.NDArray[np.float64] = np.empty(0)
+        self.B_ij: npt.NDArray[np.float64] = np.empty(0)
 
     @classmethod
     def from_g2o(cls, line: list[str], poses: list[SE2]) -> Self:
-        pose_ids = (int(line[0]), int(line[1]))
-        z = SE2.from_g2o(line[2:5])
-        i11, i12, i13, i22, i23, i33 = [float(s) for s in line[5:]]
+        pose_ids = (int(line[1]), int(line[2]))
+
+        t = np.array([float(line[3]), float(line[4])], dtype=np.float64)
+        theta = float(line[5])
+        z = SE2(t, theta)
+
+        i11, i12, i13, i22, i23, i33 = [float(s) for s in line[6:]]
         info = np.array(
             [
                 [i11, i12, i13],
@@ -48,17 +54,16 @@ class Edge:
         val = cast(np.float64, e_compact.T @ self.info @ e_compact)
         return val
 
-    def calc_jacobians(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def calc_jacobians(self):
         p_i = self.poses[self.pose_ids[0]]
         p_j = self.poses[self.pose_ids[1]]
         J_error_wrt_pred = SE2.J_sub_p1(p_j - p_i, self.z)
 
-        A_ij = J_error_wrt_pred @ SE2.J_sub_p2(p_j, p_i)
-        B_ij = J_error_wrt_pred @ SE2.J_sub_p1(p_j, p_i)
-        return (A_ij, B_ij)
+        self.A_ij = J_error_wrt_pred @ SE2.J_sub_p2(p_j, p_i)
+        self.B_ij = J_error_wrt_pred @ SE2.J_sub_p1(p_j, p_i)
 
     def calc_b(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        A_ij, B_ij = self.calc_jacobians()
+        A_ij, B_ij = self.A_ij, self.B_ij
         e_compact = self.e.to_compact()
         return (
             A_ij.T @ self.info @ e_compact,
@@ -66,7 +71,7 @@ class Edge:
         )
 
     def calc_H(self) -> list[tuple[int, int, npt.NDArray[np.float64]]]:
-        A_ij, B_ij = self.calc_jacobians()
+        A_ij, B_ij = self.A_ij, self.B_ij
         i, j = self.pose_ids
         i = i * SE2.COMPACT_DIM
         j = j * SE2.COMPACT_DIM
