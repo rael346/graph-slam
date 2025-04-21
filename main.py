@@ -1,12 +1,12 @@
-from graphslam.graph import Graph
+from slam.graph import Graph
 
 
 def main():
-    g = Graph("./dataset/input_M3500_g2o.g2o")
+    g = Graph.from_g2o("./dataset/input_M3500b_g2o.g2o")
 
-    g.optimize()
-    g.gif()
-    g.show()
+    g.plot()
+    g.optimize(40)
+    g.plot()
 
 
 if __name__ == "__main__":

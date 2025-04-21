@@ -81,12 +81,19 @@ class Graph:
         prev_chi2 = float("inf")
 
         for optimize_i in range(max_iter):
+            # pre-calculate the edges' error since it is used in
+            # chi2 and gradient b calculation. Speed up the calculation a bit
+            for e in self.edges:
+                e.calc_e_compact()
+
             curr_chi2 = self.calc_chi2()
             print(f"Iter {optimize_i} | chi2 val {curr_chi2}")
             if np.isclose(prev_chi2, curr_chi2):
                 break
             prev_chi2 = curr_chi2
 
+            # pre-calculate the edges' jacobian contribution since it is used in
+            # Hessian and gradient calculation. Also speed up the calculation a bit
             for e in self.edges:
                 e.calc_jacobians()
 

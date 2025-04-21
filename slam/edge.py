@@ -19,6 +19,8 @@ class Edge:
         self.info = info
         self.z = z
         self.poses = poses
+
+        self.err_compact: npt.NDArray[np.float64] = np.empty(0)
         self.A_ij: npt.NDArray[np.float64] = np.empty(0)
         self.B_ij: npt.NDArray[np.float64] = np.empty(0)
 
@@ -41,16 +43,18 @@ class Edge:
         )
         return cls(pose_ids, info, z, poses)
 
-    @property
-    def e(self) -> SE2:
+    # @property
+    def calc_e_compact(self):
         p_i = self.poses[self.pose_ids[0]]
         p_j = self.poses[self.pose_ids[1]]
-        return (p_j - p_i) - self.z
+
+        self.err_compact = ((p_j - p_i) - self.z).to_compact()
+        # return ((p_j - p_i) - self.z).to_compact()
 
     def calc_chi2(self) -> float:
         # the type for np.matmul couldn't infer the
         # single return value case so this is just to make the inference a bit better
-        e_compact = self.e.to_compact()
+        e_compact = self.err_compact
         val = cast(np.float64, e_compact.T @ self.info @ e_compact)
         return val
 
@@ -64,7 +68,7 @@ class Edge:
 
     def calc_b(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         A_ij, B_ij = self.A_ij, self.B_ij
-        e_compact = self.e.to_compact()
+        e_compact = self.err_compact
         return (
             A_ij.T @ self.info @ e_compact,
             B_ij.T @ self.info @ e_compact,

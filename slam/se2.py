@@ -3,6 +3,7 @@ from matplotlib.axes import Axes
 import numpy as np
 import numpy.typing as npt
 import typing
+import math
 
 
 def norm_angle(angle: float) -> float:
@@ -30,8 +31,8 @@ class SE2:
     def R(self) -> npt.NDArray[np.float64]:
         return np.array(
             [
-                [np.cos(self.theta), -np.sin(self.theta)],
-                [np.sin(self.theta), np.cos(self.theta)],
+                [math.cos(self.theta), -math.sin(self.theta)],
+                [math.sin(self.theta), math.cos(self.theta)],
             ],
             dtype=np.float64,
         )
@@ -40,8 +41,8 @@ class SE2:
     def dR(self) -> npt.NDArray[np.float64]:
         return np.array(
             [
-                [-np.sin(self.theta), -np.cos(self.theta)],
-                [np.cos(self.theta), -np.sin(self.theta)],
+                [-math.sin(self.theta), -math.cos(self.theta)],
+                [math.cos(self.theta), -math.sin(self.theta)],
             ],
             dtype=np.float64,
         )
@@ -89,15 +90,12 @@ class SE2:
     def J_add_delta_x(p: SE2) -> npt.NDArray[np.float64]:
         return np.array(
             [
-                [np.cos(p.theta), -np.sin(p.theta), 0],
-                [np.sin(p.theta), np.cos(p.theta), 0],
+                [math.cos(p.theta), -math.sin(p.theta), 0],
+                [math.sin(p.theta), math.cos(p.theta), 0],
                 [0, 0, 1],
             ],
             dtype=np.float64,
         )
-
-    def plot(self, ax: Axes):
-        ax.plot(self.t[0], self.t[1], color="darkorange", marker="o", markersize=3)
 
     def __add__(self, other: SE2) -> SE2:
         return SE2(self.R @ other.t + self.t, self.theta + other.theta)
@@ -110,4 +108,7 @@ class SE2:
         self.theta = norm_angle(self.theta + delta[2])
 
     def __str__(self) -> str:
-        return f"PoseSE2(t=[{self.t[0]}, {self.t[1]}], theta={self.theta})"
+        return f"SE2(t=[{self.t[0]}, {self.t[1]}], theta={self.theta})"
+
+    def plot(self, ax: Axes):
+        ax.plot(self.t[0], self.t[1], color="darkorange", marker="o", markersize=3)
