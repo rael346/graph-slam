@@ -4,7 +4,7 @@
 
 Intel Dataset Before Optimization |  After optimization
 :-------------------------:|:-------------------------:
-![](./report/results/intel_before.png) | ![](./report/results/intel_before.png)
+![](./report/results/intel_before.png) | ![](./report/results/intel_after.png)
 
 ## Requirements
 
